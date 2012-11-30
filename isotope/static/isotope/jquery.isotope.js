@@ -1,5 +1,5 @@
 /**
- * Isotope v1.0.110207
+ * Isotope v1.1.110426
  * An exquisite jQuery plugin for magical layouts
  * http://isotope.metafizzy.co
  *
@@ -9,87 +9,81 @@
  * Copyright 2011 David DeSandro / Metafizzy
  */
 
+(function( window, $, undefined ){
 
-// ========================= getStyleProperty by kangax ===============================
-// http://perfectionkills.com/feature-testing-css-properties/
+  // ========================= getStyleProperty by kangax ===============================
+  // http://perfectionkills.com/feature-testing-css-properties/
 
-var getStyleProperty = (function(){
+  var getStyleProperty = (function(){
 
-  var prefixes = ['Moz', 'Webkit', 'Khtml', 'O', 'Ms'];
-  var _cache = { };
+    var prefixes = ['Moz', 'Webkit', 'Khtml', 'O', 'Ms'];
+    var _cache = { };
 
-  function getStyleProperty(propName, element) {
-    element = element || document.documentElement;
-    var style = element.style,
-        prefixed,
-        uPropName,
-        i, l;
+    function getStyleProperty(propName, element) {
+      element = element || document.documentElement;
+      var style = element.style,
+          prefixed,
+          uPropName,
+          i, l;
 
-    // check cache only when no element is given
-    if (arguments.length === 1 && typeof _cache[propName] === 'string') {
-      return _cache[propName];
-    }
-    // test standard property first
-    if (typeof style[propName] === 'string') {
-      return (_cache[propName] = propName);
-    }
+      // check cache only when no element is given
+      if (arguments.length === 1 && typeof _cache[propName] === 'string') {
+        return _cache[propName];
+      }
+      // test standard property first
+      if (typeof style[propName] === 'string') {
+        return (_cache[propName] = propName);
+      }
     
-    // capitalize
-    uPropName = propName.charAt(0).toUpperCase() + propName.slice(1);
+      // capitalize
+      uPropName = propName.charAt(0).toUpperCase() + propName.slice(1);
 
-    // test vendor specific properties
-    for (i=0, l=prefixes.length; i<l; i++) {
-      prefixed = prefixes[i] + uPropName;
-      if (typeof style[prefixed] === 'string') {
-        return (_cache[propName] = prefixed);
+      // test vendor specific properties
+      for (i=0, l=prefixes.length; i<l; i++) {
+        prefixed = prefixes[i] + uPropName;
+        if (typeof style[prefixed] === 'string') {
+          return (_cache[propName] = prefixed);
+        }
       }
     }
-  }
 
-  return getStyleProperty;
-}());
+    return getStyleProperty;
+  }());
 
-// ========================= miniModernizr ===============================
-// <3<3<3 and thanks to Faruk and Paul for doing the heavy lifting
+  // ========================= miniModernizr ===============================
+  // <3<3<3 and thanks to Faruk and Paul for doing the heavy lifting
 
-/*!
- * Modernizr v1.6ish: miniModernizr for Isotope
- * http://www.modernizr.com
- *
- * Developed by: 
- * - Faruk Ates  http://farukat.es/
- * - Paul Irish  http://paulirish.com/
- *
- * Copyright (c) 2009-2010
- * Dual-licensed under the BSD or MIT licenses.
- * http://www.modernizr.com/license/
- */
+  /*!
+   * Modernizr v1.6ish: miniModernizr for Isotope
+   * http://www.modernizr.com
+   *
+   * Developed by: 
+   * - Faruk Ates  http://farukat.es/
+   * - Paul Irish  http://paulirish.com/
+   *
+   * Copyright (c) 2009-2010
+   * Dual-licensed under the BSD or MIT licenses.
+   * http://www.modernizr.com/license/
+   */
 
  
-/*
- * This version whittles down the script just to check support for
- * CSS transitions, transforms, and 3D transforms.
- */
- 
-window.Modernizr = window.Modernizr || (function(window,doc,undefined){
+  /*
+   * This version whittles down the script just to check support for
+   * CSS transitions, transforms, and 3D transforms.
+  */
   
-  var version = '1.6ish: miniModernizr for Isotope',
-      miniModernizr = {},
+  var docElement = document.documentElement,
       vendorCSSPrefixes = ' -o- -moz- -ms- -webkit- -khtml- '.split(' '),
-      classes = [],
-      docElement = document.documentElement,
-      i, l,
-
       tests = [
         {
           name : 'csstransforms',
-          result : function() {
+          getResult : function() {
             return !!getStyleProperty('transform');
           }
         },
         {
           name : 'csstransforms3d',
-          result : function() {
+          getResult : function() {
             var test = !!getStyleProperty('perspective');
             // double check for Chrome's false positive
             if ( test ){
@@ -98,7 +92,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
                   mq = '@media (' + vendorCSSPrefixes.join('transform-3d),(') + 'modernizr)';
 
               st.textContent = mq + '{#modernizr{height:3px}}';
-              (doc.head || doc.getElementsByTagName('head')[0]).appendChild(st);
+              (document.head || document.getElementsByTagName('head')[0]).appendChild(st);
               div.id = 'modernizr';
               docElement.appendChild(div);
 
@@ -112,34 +106,50 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
         },
         {
           name : 'csstransitions',
-          result : function() {
+          getResult : function() {
             return !!getStyleProperty('transitionProperty');
           }
         }
-      ]
+      ],
+
+      i, len = tests.length
   ;
 
+  if ( window.Modernizr ) {
+    // if there's a previous Modernzir, check if there are necessary tests
+    for ( i=0; i < len; i++ ) {
+      var test = tests[i];
+      if ( !Modernizr.hasOwnProperty( test.name ) ) {
+        // if test hasn't been run, use addTest to run it
+        Modernizr.addTest( test.name, test.getResult );
+      }
+    }
+  } else {
+    // or create new mini Modernizr that just has the 3 tests
+    window.Modernizr = (function(){
 
-  // Run through all tests and detect their support in the current UA.
-  for ( i = 0, len = tests.length; i < len; i++ ) {
-    var test = tests[i],
-        result = test.result();
-    miniModernizr[ test.name ] = result;
-    var className = ( result ?  '' : 'no-' ) + test.name;
-    classes.push( className );
+      var miniModernizr = {
+            _version : '1.6ish: miniModernizr for Isotope'
+          },
+          classes = [],
+          test, result, className;
+
+      // Run through tests
+      for ( i=0; i < len; i++ ) {
+        test = tests[i];
+        result = test.getResult();
+        miniModernizr[ test.name ] = result;
+        className = ( result ?  '' : 'no-' ) + test.name;
+        classes.push( className );
+      }
+
+      // Add the new classes to the <html> element.
+      docElement.className += ' ' + classes.join( ' ' );
+
+      return miniModernizr;
+    })();
   }
 
-  // Add the new classes to the <html> element.
-  docElement.className += ' ' + classes.join( ' ' );
-
-  return miniModernizr;
-  
-}(this,this.document));
-
-
-
-// jQuery
-(function( $, undefined ){
 
 
   // ========================= isoTransform ===============================
@@ -150,7 +160,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
    *  Uses hardware accelerated 3D transforms for Safari
    *  or falls back to 2D transforms.
    */
-  $.isoTransform = {
+  var isoTransform = {
     
     transformProp : getStyleProperty('transform'),
     
@@ -174,20 +184,21 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
     ,
     
     set : function( elem, name, value ) {
-
-      // unpack current transform data
-      var data =  $( elem ).data('transform') || {},
-      // extend new value over current data
+      var $elem = $(elem),
+          // unpack current transform data
+          data =  $elem.data('isoTransform') || {},
           newData = {},
           fnName,
           transformObj = {};
-      // overwrite new data
+
+      // i.e. newData.scale = 0.5
       newData[ name ] = value;
+      // extend new value over current data
       $.extend( data, newData );
 
       for ( fnName in data ) {
         var transformValue = data[ fnName ],
-            getFn = $.isoTransform.fnUtils[ fnName ];
+            getFn = isoTransform.fnUtils[ fnName ];
         transformObj[ fnName ] = getFn( transformValue );
       }
 
@@ -196,16 +207,14 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
       // a couple transforms we're keeping track of, we'll do it like so
       var translateFn = transformObj.translate || '',
           scaleFn = transformObj.scale || '',
+          // sorting so translate always comes first
           valueFns = translateFn + scaleFn;
 
       // set data back in elem
-      $( elem ).data( 'transform', data );
-
-      // sorting so scale always comes before 
-      value = valueFns;
+      $elem.data( 'isoTransform', data );
 
       // set name to vendor specific property
-      elem.style[ $.isoTransform.transformProp ] = valueFns;
+      elem.style[ isoTransform.transformProp ] = valueFns;
 
     }
   };
@@ -221,7 +230,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
         value = parseFloat( value );
       }
 
-      $.isoTransform.set( elem, 'scale', value );
+      isoTransform.set( elem, 'scale', value );
 
     },
     get: function( elem, computed ) {
@@ -258,7 +267,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
       //   }
       // }
 
-      $.isoTransform.set( elem, 'translate', value );
+      isoTransform.set( elem, 'translate', value );
 
     },
     
@@ -322,6 +331,9 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
     this._create( options );
     this._init();
   };
+  
+  // styles of container element we want to keep track of
+  var isoContainerStyles = [ 'overflow', 'position', 'width', 'height' ];
 
   $.Isotope.prototype = {
 
@@ -344,7 +356,9 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
       },
       sortBy : 'original-order',
       sortAscending : true,
-      resizesContainer : true
+      resizesContainer : true,
+      transformsEnabled : true,
+      itemPositionDataEnabled: false
     },
     
     _filterFind: function( $elems, selector ) {
@@ -361,6 +375,14 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
       this.elemCount = 0;
       // need to get atoms
       this.$allAtoms = this._filterFind( this.element.children(), this.options.itemSelector );
+
+      // get original styles in case we re-apply them in .destroy()
+      var elemStyle = this.element[0].style;
+      this.originalStyle = {};
+      for ( var i=0, len = isoContainerStyles.length; i < len; i++ ) {
+        var prop = isoContainerStyles[i];
+        this.originalStyle[ prop ] = elemStyle[ prop ] || null;
+      }
       
       this.element.css({
         overflow : 'hidden',
@@ -371,6 +393,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
 
       // get applyStyleFnName
       switch ( this.options.animationEngine.toLowerCase().replace( /[ _\-]/g, '') ) {
+        case 'css' :
         case 'none' :
           this.applyStyleFnName = 'css';
           break;
@@ -378,14 +401,13 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
           this.applyStyleFnName = 'animate';
           jQueryAnimation = true;
           break;
-        case 'bestavailable' :
-        default :
+        default : // best available
           this.applyStyleFnName = Modernizr.csstransitions ? 'css' : 'animate';
       }
       
-      this.usingTransforms = Modernizr.csstransforms && Modernizr.csstransitions && !jQueryAnimation;
+      this.usingTransforms = this.options.transformsEnabled && Modernizr.csstransforms && Modernizr.csstransitions && !jQueryAnimation;
 
-      this.positionFn = this.usingTransforms ? this._translate : this._positionAbs;
+      this.getPositionStyles = this.usingTransforms ? this._translate : this._positionAbs;
       
       // sorting
       var originalOrderSorter = {
@@ -488,21 +510,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
 
       $atoms.css( atomStyle ).addClass( this.options.itemClass );
       
-      var instance = this;
-      $atoms.each(function(){
-        var $this = $(this),
-            sortData = {},
-            getSortData = instance.options.getSortData,
-            key;
-        // get value for sort data based on fn( $elem ) passed in
-        for ( key in getSortData ) {
-          sortData[ key ] = getSortData[ key ]( $this, instance );
-        }
-        // apply sort data to $element
-        $this.data( 'isotope-sort-data', sortData );
-        // increment element count
-        instance.elemCount ++;
-      });
+      this.updateSortData( $atoms, true );
 
     },
     
@@ -540,6 +548,25 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
     
     // ====================== Sorting ======================
     
+    updateSortData : function( $atoms, isIncrementingElemCount ) {
+      var instance = this,
+          getSortData = this.options.getSortData,
+          $this, sortData;
+      $atoms.each(function(){
+        $this = $(this);
+        sortData = {};
+        // get value for sort data based on fn( $elem ) passed in
+        for ( var key in getSortData ) {
+          sortData[ key ] = getSortData[ key ]( $this, instance );
+        }
+        // apply sort data to $element
+        $this.data( 'isotope-sort-data', sortData );
+        if ( isIncrementingElemCount ) {
+          instance.elemCount ++;
+        }
+      });
+    },
+    
     // used on all the filtered atoms
     _sort : function() {
       
@@ -547,7 +574,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
           getSorter = function( elem ) {
             return $(elem).data('isotope-sort-data')[ instance.options.sortBy ];
           },
-          sortDir = this.options.sortAscending ? 1 : -1;
+          sortDir = this.options.sortAscending ? 1 : -1,
           sortFn = function( alpha, beta ) {
             var a = getSorter( alpha ),
                 b = getSorter( beta );
@@ -572,8 +599,11 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
     },
 
     _pushPosition : function( $elem, x, y ) {
-      var position = this.positionFn( x, y );
+      var position = this.getPositionStyles( x, y );
       this.styleQueue.push({ $el: $elem, style: position });
+      if ( this.options.itemPositionDataEnabled ) {
+        $elem.data('isotope-item-position', {x: x, y: y} );
+      }
     },
 
 
@@ -583,8 +613,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
     // accepts atoms-to-be-laid-out to start with
     layout : function( $elems, callback ) {
 
-      var layoutMode = this.options.layoutMode,
-          layoutMethod = '_' + layoutMode;
+      var layoutMode = this.options.layoutMode;
 
       // layout logic
       this[ '_' +  layoutMode + 'Layout' ]( $elems );
@@ -602,14 +631,10 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
                     'css' : this.applyStyleFnName,
           animOpts = this.options.animationOptions;
 
-
       // process styleQueue
-      $.each( this.styleQueue, function( i, obj ){
-                                       // have to extend animation to play nice with jQuery
-        obj.$el[ styleFn ]( obj.style, $.extend( {}, animOpts ) );
+      $.each( this.styleQueue, function( i, obj ) {
+        obj.$el[ styleFn ]( obj.style, animOpts );
       });
-      
-      
 
       // clear out queue for next time
       this.styleQueue = [];
@@ -631,8 +656,10 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
     
     
     reLayout : function( callback ) {
+      
       return this[ '_' +  this.options.layoutMode + 'Reset' ]()
         .layout( this.$filteredAtoms, callback );
+      
     },
     
     // ====================== Convenience methods ======================
@@ -656,7 +683,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
       
       var instance = this;
       this.addItems( $content, function( $newAtoms ) {
-        $filteredAtoms = instance._filter( $newAtoms );
+        var $filteredAtoms = instance._filter( $newAtoms );
         instance.$filteredAtoms = instance.$filteredAtoms.add( $filteredAtoms );
       });
       
@@ -709,25 +736,29 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
     
     // destroys widget, returns elements and container back (close) to original style
     destroy : function() {
-      var atomUnstyle = $.extend( this.options.visibleStyle, {
-        position: 'relative',
-        top: 'auto',
-        left: 'auto'
-      });
+
+      var usingTransforms = this.usingTransforms;
+
+      this.$allAtoms
+        .removeClass( this.options.hiddenClass + ' ' + this.options.itemClass )
+        .each(function(){
+          this.style.position = null;
+          this.style.top = null;
+          this.style.left = null;
+          this.style.opacity = null;
+          if ( usingTransforms ) {
+            this.style[ isoTransform.transformProp ] = null;
+          }
+        });
       
-      if ( this.usingTransforms ) {
-        atomUnstyle[ $.isoTransform.transformProp ] = 'none';
+      // re-apply saved container styles
+      var elemStyle = this.element[0].style;
+      for ( var i=0, len = isoContainerStyles.length; i < len; i++ ) {
+        var prop = isoContainerStyles[i];
+        elemStyle[ prop ] = this.originalStyle[ prop ];
       }
       
-      this.$allAtoms
-        .css( atomUnstyle )
-        .removeClass( this.options.hiddenClass );
-      
       this.element
-        .css({
-          width: 'auto',
-          height: 'auto'
-        })
         .unbind('.isotope')
         .removeClass( this.options.containerClass )
         .removeData('isotope');
@@ -743,18 +774,26 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
       var measure  = isRows ? 'rowHeight' : 'columnWidth',
           size     = isRows ? 'height' : 'width',
           UCSize   = isRows ? 'Height' : 'Width',
-          segments = isRows ? 'rows' : 'cols';
+          segmentsName = isRows ? 'rows' : 'cols',
+          segments,
+          segmentSize;
       
-      this[ namespace ][ measure ] = ( this.options[ namespace ] && this.options[ namespace ][ measure ] ) || this.$allAtoms[ 'outer' + UCSize ](true);
-      
-      // if colW == 0, back out before divide by zero
-      if ( !this[ namespace ][ measure ] ) {
-        $.error( measure + ' calculated to be zero. Stopping Isotope plugin before divide by zero. Check that the width of first child inside the isotope container is not zero.');
-        return this;
-      }
       this[ size ] = this.element[ size ]();
-      this[ namespace ][ segments ] = Math.floor( this[ size ] / this[ namespace ][ measure ] );
-      this[ namespace ][ segments ] = Math.max( this[ namespace ][ segments ], 1 );
+      
+                    // i.e. options.masonry && options.masonry.columnWidth
+      segmentSize = this.options[ namespace ] && this.options[ namespace ][ measure ] ||
+                    // or use the size of the first item
+                    this.$filteredAtoms[ 'outer' + UCSize ](true) ||
+                    // if there's no items, use size of container
+                    this[ size ];
+      
+      segments = Math.floor( this[ size ] / segmentSize );
+      segments = Math.max( segments, 1 );
+
+      // i.e. this.masonry.cols = ....
+      this[ namespace ][ segmentsName ] = segments;
+      // i.e. this.masonry.columnWidth = ...
+      this[ namespace ][ measure ] = segmentSize;
       
       return this;
       
@@ -824,6 +863,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
           instance._masonryPlaceBrick( $this, groupCount, groupY );
         }
       });
+      return this;
     },
   
     // reset
@@ -864,7 +904,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
       this.width = this.element.width();
       var instance = this;
       
-      return $elems.each( function() {
+      $elems.each( function() {
         var $this = $(this),
             atomW = $this.outerWidth(true),
             atomH = $this.outerHeight(true),
@@ -885,6 +925,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
         instance.fitRows.x += atomW;
   
       });
+      return this;
     },
   
     _fitRowsReset : function() {
@@ -901,7 +942,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
     },
   
     _fitRowsResize : function() {
-      return this.reLayout()
+      return this.reLayout();
     },
   
 
@@ -920,10 +961,10 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
       this.cellsByRow.atomsLen = $elems.length;
       $elems.each( function( i ){
         var $this = $(this),
-            x = ( i % cols + 0.5 ) * instance.cellsByRow.columnWidth
-                - $this.outerWidth(true) / 2 + instance.posLeft,
-            y = ( ~~( i / cols ) + 0.5 ) * instance.cellsByRow.rowHeight 
-                - $this.outerHeight(true) / 2 + instance.posTop;
+            x = ( i % cols + 0.5 ) * instance.cellsByRow.columnWidth -
+                  $this.outerWidth(true) / 2 + instance.posLeft,
+            y = ( ~~( i / cols ) + 0.5 ) * instance.cellsByRow.rowHeight -
+                  $this.outerHeight(true) / 2 + instance.posTop;
         instance._pushPosition( $this, x, y );
       });
       return this;
@@ -960,7 +1001,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
         var $this = $(this),
             y = instance.straightDown.y + instance.posTop;
         instance._pushPosition( $this, instance.posLeft, y );
-        instance.straightDown.y += $this.outerHeight(true)
+        instance.straightDown.y += $this.outerHeight(true);
       });
       return this;
     },
@@ -1021,10 +1062,10 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
           // how many different places could this brick fit horizontally
           var groupCount = instance.masonryHorizontal.rows + 1 - rowSpan,
               groupX = [],
-              groupRowX;
+              groupRowX, i;
 
           // for each group potential horizontal position
-          for ( var i=0; i < groupCount; i++ ) {
+          for ( i=0; i < groupCount; i++ ) {
             // make an array of colY values for that one group
             groupRowX = instance.masonryHorizontal.rowXs.slice( i, i+rowSpan );
             // and get the max value of the array
@@ -1034,6 +1075,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
           instance._masonryHorizontalPlaceBrick( $this, groupCount, groupX );
         }
       });
+      return this;
     },
     
     _masonryHorizontalReset : function() {
@@ -1081,7 +1123,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
     _fitColumnsLayout : function( $elems ) {
       var instance = this;
       this.height = this.element.height();
-      return $elems.each( function() {
+      $elems.each( function() {
         var $this = $(this),
             atomW = $this.outerWidth(true),
             atomH = $this.outerHeight(true),
@@ -1102,6 +1144,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
         instance.fitColumns.y += atomH;
 
       });
+      return this;
     },
     
     _fitColumnsGetContainerSize : function () {
@@ -1129,10 +1172,10 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
       this.cellsByColumn.atomsLen = $elems.length;
       $elems.each( function( i ){
         var $this = $(this),
-            x = ( ~~( i / rows ) + 0.5 )  * instance.cellsByColumn.columnWidth
-                - $this.outerWidth(true) / 2 + instance.posLeft,
-            y = ( i % rows + 0.5 ) * instance.cellsByColumn.rowHeight 
-                - $this.outerHeight(true) / 2 + instance.posTop;
+            x = ( ~~( i / rows ) + 0.5 )  * instance.cellsByColumn.columnWidth -
+                  $this.outerWidth(true) / 2 + instance.posLeft,
+            y = ( i % rows + 0.5 ) * instance.cellsByColumn.rowHeight -
+                  $this.outerHeight(true) / 2 + instance.posTop;
         instance._pushPosition( $this, x, y );
       });
       return this;
@@ -1162,13 +1205,14 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
   // mit license. paul irish. 2010.
   // webkit fix from Oren Solomianik. thx!
 
-  // callback function is passed the last image to load
-  //   as an argument, and the collection as `this`
-
   $.fn.imagesLoaded = function(callback){
     var elems = this.find('img'),
         len   = elems.length,
         _this = this;
+
+    if ( !elems.length ) {
+      callback.call( this );
+    }
 
     elems.bind('load',function(){
       if (--len <= 0){ 
@@ -1187,6 +1231,7 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
 
     return this;
   };
+
   
 
 // ======================= jQuery Widget bridge  ===============================
@@ -1254,4 +1299,4 @@ window.Modernizr = window.Modernizr || (function(window,doc,undefined){
   
   $.widget.bridge( 'isotope', $.Isotope );
 
-})( jQuery );
+})( window, jQuery );
