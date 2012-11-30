@@ -1,5 +1,5 @@
 /**
- * Isotope v1.1.110426
+ * Isotope v1.2.110513
  * An exquisite jQuery plugin for magical layouts
  * http://isotope.metafizzy.co
  *
@@ -17,38 +17,29 @@
   var getStyleProperty = (function(){
 
     var prefixes = ['Moz', 'Webkit', 'Khtml', 'O', 'Ms'];
-    var _cache = { };
 
     function getStyleProperty(propName, element) {
       element = element || document.documentElement;
       var style = element.style,
-          prefixed,
-          uPropName,
-          i, l;
+          prefixed;
 
-      // check cache only when no element is given
-      if (arguments.length === 1 && typeof _cache[propName] === 'string') {
-        return _cache[propName];
-      }
       // test standard property first
-      if (typeof style[propName] === 'string') {
-        return (_cache[propName] = propName);
-      }
-    
+      if (typeof style[propName] == 'string') return propName;
+
       // capitalize
-      uPropName = propName.charAt(0).toUpperCase() + propName.slice(1);
+      propName = propName.charAt(0).toUpperCase() + propName.slice(1);
 
       // test vendor specific properties
-      for (i=0, l=prefixes.length; i<l; i++) {
-        prefixed = prefixes[i] + uPropName;
-        if (typeof style[prefixed] === 'string') {
-          return (_cache[propName] = prefixed);
-        }
+      for (var i=0, l=prefixes.length; i<l; i++) {
+        prefixed = prefixes[i] + propName;
+        if (typeof style[prefixed] == 'string') return prefixed;
       }
     }
 
     return getStyleProperty;
-  }());
+  })();
+
+  var transformProp = getStyleProperty('transform');
 
   // ========================= miniModernizr ===============================
   // <3<3<3 and thanks to Faruk and Paul for doing the heavy lifting
@@ -78,7 +69,7 @@
         {
           name : 'csstransforms',
           getResult : function() {
-            return !!getStyleProperty('transform');
+            return !!transformProp;
           }
         },
         {
@@ -155,16 +146,16 @@
   // ========================= isoTransform ===============================
 
   /**
-   *  provides hooks for .css({ scale: value, translate: x y })
+   *  provides hooks for .css({ scale: value, translate: [x, y] })
    *  Progressively enhanced CSS transforms
    *  Uses hardware accelerated 3D transforms for Safari
    *  or falls back to 2D transforms.
    */
-  var isoTransform = {
+  
+  if ( Modernizr.csstransforms ) {
     
-    transformProp : getStyleProperty('transform'),
-    
-    fnUtils : Modernizr.csstransforms3d ? 
+        // i.e. transformFnNotations.scale(0.5) >> 'scale3d( 0.5, 0.5, 1)'
+    var transformFnNotations = Modernizr.csstransforms3d ? 
       { // 3D transform functions
         translate : function ( position ) {
           return 'translate3d(' + position[0] + 'px, ' + position[1] + 'px, 0) ';
@@ -177,19 +168,20 @@
         translate : function ( position ) {
           return 'translate(' + position[0] + 'px, ' + position[1] + 'px) ';
         },
-        scale :  function ( scale ) {
+        scale : function ( scale ) {
           return 'scale(' + scale + ') ';
         }
       }
-    ,
-    
-    set : function( elem, name, value ) {
+    ;
+
+    var setIsoTransform = function ( elem, name, value ) {
       var $elem = $(elem),
           // unpack current transform data
           data =  $elem.data('isoTransform') || {},
           newData = {},
           fnName,
-          transformObj = {};
+          transformObj = {},
+          transformValue;
 
       // i.e. newData.scale = 0.5
       newData[ name ] = value;
@@ -197,9 +189,8 @@
       $.extend( data, newData );
 
       for ( fnName in data ) {
-        var transformValue = data[ fnName ],
-            getFn = isoTransform.fnUtils[ fnName ];
-        transformObj[ fnName ] = getFn( transformValue );
+        transformValue = data[ fnName ];
+        transformObj[ fnName ] = transformFnNotations[ fnName ]( transformValue );
       }
 
       // get proper order
@@ -214,81 +205,75 @@
       $elem.data( 'isoTransform', data );
 
       // set name to vendor specific property
-      elem.style[ isoTransform.transformProp ] = valueFns;
-
-    }
-  };
+      elem.style[ transformProp ] = valueFns;
+    };
+   
+    // ==================== scale ===================
   
-  // ==================== scale ===================
+    $.cssNumber.scale = true;
   
-  $.cssNumber.scale = true;
-  
-  $.cssHooks.scale = {
-    set: function( elem, value ) {
-
-      if ( typeof value === 'string' ) {
-        value = parseFloat( value );
+    $.cssHooks.scale = {
+      set: function( elem, value ) {
+        // properly parse strings
+        if ( typeof value === 'string' ) {
+          value = parseFloat( value );
+        }
+        setIsoTransform( elem, 'scale', value );
+      },
+      get: function( elem, computed ) {
+        var transform = $.data( elem, 'isoTransform' );
+        return transform && transform.scale ? transform.scale : 1;
       }
+    };
 
-      isoTransform.set( elem, 'scale', value );
-
-    },
-    get: function( elem, computed ) {
-      var transform = $.data( elem, 'transform' );
-      return transform && transform.scale ? transform.scale : 1;
-    }
-  };
-
-  $.fx.step.scale = function( fx ) {
-    $.cssHooks.scale.set( fx.elem, fx.now+fx.unit );
-  };
+    $.fx.step.scale = function( fx ) {
+      $.cssHooks.scale.set( fx.elem, fx.now+fx.unit );
+    };
   
   
-  // ==================== translate ===================
+    // ==================== translate ===================
     
-  $.cssNumber.translate = true;
+    $.cssNumber.translate = true;
   
-  $.cssHooks.translate = {
-    set: function( elem, value ) {
+    $.cssHooks.translate = {
+      set: function( elem, value ) {
 
-      // all this would be for public ease-of-use,
-      // but we're leaving it out since this add-on is
-      // only for internal-plugin use
-      // if ( typeof value === 'string' ) {
-      //   value = value.split(' ');
-      // }
-      // 
-      //  
-      // var i, val;
-      // for ( i = 0; i < 2; i++ ) {
-      //   val = value[i];
-      //   if ( typeof val === 'string' ) {
-      //     val = parseInt( val );
-      //   }
-      // }
+        // all this would be for public use
+        // properly parsing strings and whatnot
+        // if ( typeof value === 'string' ) {
+        //   value = value.split(' ');
+        // }
+        // 
+        // var i, val;
+        // for ( i = 0; i < 2; i++ ) {
+        //   val = value[i];
+        //   if ( typeof val === 'string' ) {
+        //     val = parseInt( val );
+        //   }
+        // }
 
-      isoTransform.set( elem, 'translate', value );
-
-    },
+        setIsoTransform( elem, 'translate', value );
+      },
     
-    get: function( elem, computed ) {
-      var transform = $.data( elem, 'transform' );
-      return transform && transform.translate ? transform.translate : [ 0, 0 ];
-    }
-  };
+      get: function( elem, computed ) {
+        var transform = $.data( elem, 'isoTransform' );
+        return transform && transform.translate ? transform.translate : [ 0, 0 ];
+      }
+    };
+
+  }
 
 
 
-
-/*!
- * smartresize: debounced resize event for jQuery
- * http://github.com/lrbabe/jquery-smartresize
- *
- * Copyright (c) 2009 Louis-Remi Babe
- * Licensed under the GPL license.
- * http://docs.jquery.com/License
- *
- */
+  /*
+   * smartresize: debounced resize event for jQuery
+   *
+   * latest version and complete README available on Github:
+   * https://github.com/louisremi/jquery.smartresize.js
+   *
+   * Copyright 2011 @louis_remi
+   * Licensed under the MIT license.
+   */
 
   var $event = $.event,
       resizeTimeout;
@@ -334,33 +319,33 @@
   
   // styles of container element we want to keep track of
   var isoContainerStyles = [ 'overflow', 'position', 'width', 'height' ];
+  
+  $.Isotope.settings = {
+    resizable: true,
+    layoutMode : 'masonry',
+    containerClass : 'isotope',
+    itemClass : 'isotope-item',
+    hiddenClass : 'isotope-hidden',
+    hiddenStyle : Modernizr.csstransforms && !$.browser.opera ? 
+      { opacity : 0, scale : 0.001 } : // browsers support CSS transforms, not Opera
+      { opacity : 0 }, // other browsers, including Opera
+    visibleStyle : Modernizr.csstransforms && !$.browser.opera ? 
+      { opacity : 1, scale : 1 } : // browsers support CSS transforms, not Opera
+      { opacity : 1 },  // other browsers, including Opera
+    animationEngine : $.browser.opera ? 'jquery' : 'best-available',
+    animationOptions: {
+      queue: false,
+      duration: 800
+    },
+    sortBy : 'original-order',
+    sortAscending : true,
+    resizesContainer : true,
+    transformsEnabled : true,
+    itemPositionDataEnabled: false
+  };
 
   $.Isotope.prototype = {
 
-    options : {
-      resizable: true,
-      layoutMode : 'masonry',
-      containerClass : 'isotope',
-      itemClass : 'isotope-item',
-      hiddenClass : 'isotope-hidden',
-      hiddenStyle : Modernizr.csstransforms && !$.browser.opera ? 
-        { opacity : 0, scale : 0.001 } : // browsers support CSS transforms, not Opera
-        { opacity : 0 }, // other browsers, including Opera
-      visibleStyle : Modernizr.csstransforms && !$.browser.opera ? 
-        { opacity : 1, scale : 1 } : // browsers support CSS transforms, not Opera
-        { opacity : 1 },  // other browsers, including Opera
-      animationEngine : $.browser.opera ? 'jquery' : 'best-available',
-      animationOptions: {
-        queue: false,
-        duration: 800
-      },
-      sortBy : 'original-order',
-      sortAscending : true,
-      resizesContainer : true,
-      transformsEnabled : true,
-      itemPositionDataEnabled: false
-    },
-    
     _filterFind: function( $elems, selector ) {
       return selector ? $elems.filter( selector ).add( $elems.find( selector ) ) : $elems;
     },
@@ -368,9 +353,8 @@
     // sets up widget
     _create : function( options ) {
       
-      this.options = $.extend( true, {}, this.options, options );
+      this.options = $.extend( true, {}, $.Isotope.settings, options );
       
-      this.isNew = {};
       this.styleQueue = [];
       this.elemCount = 0;
       // need to get atoms
@@ -388,26 +372,9 @@
         overflow : 'hidden',
         position : 'relative'
       });
-
-      var jQueryAnimation = false;
-
-      // get applyStyleFnName
-      switch ( this.options.animationEngine.toLowerCase().replace( /[ _\-]/g, '') ) {
-        case 'css' :
-        case 'none' :
-          this.applyStyleFnName = 'css';
-          break;
-        case 'jquery' :
-          this.applyStyleFnName = 'animate';
-          jQueryAnimation = true;
-          break;
-        default : // best available
-          this.applyStyleFnName = Modernizr.csstransitions ? 'css' : 'animate';
-      }
       
-      this.usingTransforms = this.options.transformsEnabled && Modernizr.csstransforms && Modernizr.csstransitions && !jQueryAnimation;
-
-      this.getPositionStyles = this.usingTransforms ? this._translate : this._positionAbs;
+      this._updateAnimationEngine();
+      this._updateUsingTransforms();
       
       // sorting
       var originalOrderSorter = {
@@ -443,32 +410,14 @@
       
     },
   
-    
-    _isNewProp : function( prop ) {
-      return this.prevOpts ? ( this.options[ prop ] !== this.prevOpts[ prop ] ) : true;
-    },
-  
     // _init fires when your instance is first created
     // (from the constructor above), and when you
     // attempt to initialize the widget again (by the bridge)
     // after it has already been initialized.
     _init : function( callback ) {
       
-      // check if watched properties are new
-      var instance = this;
-      $.each( [ 'filter', 'sortBy', 'sortAscending' ], function( i, propName ){
-        instance.isNew[ propName ] = instance._isNewProp( propName );
-      });
-
-      if ( this.isNew.filter ) {
-        this.$filteredAtoms = this._filter( this.$allAtoms );
-      } else {
-        this.$filteredAtoms = this.$allAtoms;
-      }
-
-      if ( this.isNew.filter || this.isNew.sortBy || this.isNew.sortAscending ) {
-        this._sort();
-      }
+      this.$filteredAtoms = this._filter( this.$allAtoms );
+      this._sort();
       
       this.reLayout( callback );
 
@@ -483,6 +432,9 @@
       // signature: $('#foo').bar({ cool:false });
       if ( $.isPlainObject( key ) ){
         this.options = $.extend(true, this.options, key);
+        for ( optionName in key ) {
+          this._updateOption( optionName );
+        }
     
       // signature: $('#foo').option('cool');  - getter
       } else if ( key && typeof value === "undefined" ){
@@ -491,9 +443,49 @@
       // signature: $('#foo').bar('option', 'baz', false);
       } else {
         this.options[ key ] = value;
+        this._updateOption( key );
       }
     
       return this; // make sure to return the instance!
+    },
+    
+    // ====================== updaters ====================== //
+    // kind of like setters
+    
+    // trigger _updateOptionName if it exists
+    _updateOption : function( optionName ) {
+      var updateOptionFn = '_update' + optionName.charAt(0).toUpperCase() + optionName.slice(1);
+      if ( this[ updateOptionFn ] ) {
+        this[ updateOptionFn ]();
+      }
+    },
+    
+    _updateAnimationEngine : function() {
+      var animationEngine = this.options.animationEngine.toLowerCase().replace( /[ _\-]/g, '');
+      // set applyStyleFnName
+      switch ( animationEngine ) {
+        case 'css' :
+        case 'none' :
+          this.isUsingJQueryAnimation = false;
+          break;
+        case 'jquery' :
+          this.isUsingJQueryAnimation = true;
+          break;
+        default : // best available
+          this.isUsingJQueryAnimation = !Modernizr.csstransitions;
+      }
+      
+      this._updateUsingTransforms();
+    },
+    
+    _updateTransformsEnabled : function() {
+      this._updateUsingTransforms();
+    },
+    
+    _updateUsingTransforms : function() {
+      this.usingTransforms = this.options.transformsEnabled && Modernizr.csstransforms && Modernizr.csstransitions && !this.isUsingJQueryAnimation;
+
+      this.getPositionStyles = this.usingTransforms ? this._translate : this._positionAbs;
     },
 
     
@@ -570,14 +562,17 @@
     // used on all the filtered atoms
     _sort : function() {
       
-      var instance = this,
-          getSorter = function( elem ) {
-            return $(elem).data('isotope-sort-data')[ instance.options.sortBy ];
-          },
+      var sortBy = this.options.sortBy,
+          getSorter = this._getSorter,
           sortDir = this.options.sortAscending ? 1 : -1,
           sortFn = function( alpha, beta ) {
-            var a = getSorter( alpha ),
-                b = getSorter( beta );
+            var a = getSorter( alpha, sortBy ),
+                b = getSorter( beta, sortBy );
+            // fall back to original order if data matches
+            if ( a === b && sortBy !== 'original-order') {
+              a = getSorter( alpha, 'original-order' );
+              b = getSorter( beta, 'original-order' );
+            }
             return ( ( a > b ) ? 1 : ( a < b ) ? -1 : 0 ) * sortDir;
           };
       
@@ -585,7 +580,10 @@
       
       return this;
     },
-    
+
+    _getSorter : function( elem, sortBy ) {
+      return $(elem).data('isotope-sort-data')[ sortBy ];
+    },
 
     // ====================== Layout ======================
 
@@ -626,9 +624,9 @@
 
       // are we animating the layout arrangement?
       // use plugin-ish syntax for css or animate
-      
-      var styleFn = ( this.applyStyleFnName === 'animate' && !this.isLaidOut ) ? 
-                    'css' : this.applyStyleFnName,
+      var styleFn = !this.isLaidOut ? 'css' : (
+            this.isUsingJQueryAnimation ? 'animate' : 'css'
+          ),
           animOpts = this.options.animationOptions;
 
       // process styleQueue
@@ -747,7 +745,7 @@
           this.style.left = null;
           this.style.opacity = null;
           if ( usingTransforms ) {
-            this.style[ isoTransform.transformProp ] = null;
+            this.style[ transformProp ] = null;
           }
         });
       
