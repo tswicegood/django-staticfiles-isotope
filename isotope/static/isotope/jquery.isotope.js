@@ -1,5 +1,5 @@
 /**
- * Isotope v1.4.110629
+ * Isotope v1.5.0
  * An exquisite jQuery plugin for magical layouts
  * http://isotope.metafizzy.co
  *
@@ -9,6 +9,7 @@
  * Copyright 2011 David DeSandro / Metafizzy
  */
 
+/*jshint curly: true, eqeqeq: true, forin: false, immed: false, newcap: true, noempty: true, undef: true */
 /*global Modernizr: true */
 
 (function( window, $, undefined ){
@@ -23,9 +24,8 @@
 
   var prefixes = 'Moz Webkit Khtml O Ms'.split(' ');
 
-  function getStyleProperty( propName, element ) {
-    element = element || document.documentElement;
-    var style = element.style,
+  function getStyleProperty( propName ) {
+    var style = document.documentElement.style,
         prefixed;
 
     // test standard property first
@@ -45,7 +45,9 @@
     }
   }
 
-  var transformProp = getStyleProperty('transform');
+  var transformProp = getStyleProperty('transform'),
+      transitionProp = getStyleProperty('transitionProperty');
+      
 
   // ========================= miniModernizr ===============================
   // <3<3<3 and thanks to Faruk and Paul for doing the heavy lifting
@@ -63,62 +65,45 @@
    * http://www.modernizr.com/license/
    */
 
- 
   /*
    * This version whittles down the script just to check support for
    * CSS transitions, transforms, and 3D transforms.
   */
   
-  var docElement = document.documentElement,
-      tests = [
-        {
-          name : 'csstransforms',
-          getResult : function() {
-            return !!transformProp;
-          }
-        },
-        {
-          name : 'csstransforms3d',
-          getResult : function() {
-            var test = !!getStyleProperty('perspective');
-            // double check for Chrome's false positive
-            if ( test ){
-              var st = document.createElement('style'),
-                  div = document.createElement('div'),
-                  vendorCSSPrefixes = ' -o- -moz- -ms- -webkit- -khtml- '.split(' '),
-                  mq = '@media (' + vendorCSSPrefixes.join('transform-3d),(') + 'modernizr)';
+  var tests = {
+    csstransforms: function() {
+      return !!transformProp;
+    },
 
-              st.textContent = mq + '{#modernizr{height:3px}}';
-              (document.head || document.getElementsByTagName('head')[0]).appendChild(st);
-              div.id = 'modernizr';
-              docElement.appendChild(div);
+    csstransforms3d: function() {
+      var test = !!getStyleProperty('perspective');
+      // double check for Chrome's false positive
+      if ( test ) {
+        var vendorCSSPrefixes = ' -o- -moz- -ms- -webkit- -khtml- '.split(' '),
+            mediaQuery = '@media (' + vendorCSSPrefixes.join('transform-3d),(') + 'modernizr)',
+            $style = $('<style>' + mediaQuery + '{#modernizr{height:3px}}' + '</style>')
+                        .appendTo('head'),
+            $div = $('<div id="modernizr" />').appendTo('html');
 
-              test = div.offsetHeight === 3;
+        test = $div.height() === 3;
 
-              st.parentNode.removeChild(st);
-              div.parentNode.removeChild(div);
-            }
-            return !!test;
-          }
-        },
-        {
-          name : 'csstransitions',
-          getResult : function() {
-            return !!getStyleProperty('transitionProperty');
-          }
-        }
-      ],
+        $div.remove();
+        $style.remove();
+      }
+      return test;
+    },
 
-      i, len = tests.length
-  ;
+    csstransitions: function() {
+      return !!transitionProp;
+    }
+  };
 
   if ( window.Modernizr ) {
     // if there's a previous Modernzir, check if there are necessary tests
-    for ( i=0; i < len; i++ ) {
-      var test = tests[i];
-      if ( !Modernizr.hasOwnProperty( test.name ) ) {
+    for ( var testName in tests) {
+      if ( !Modernizr.hasOwnProperty( testName ) ) {
         // if test hasn't been run, use addTest to run it
-        Modernizr.addTest( test.name, test.getResult );
+        Modernizr.addTest( testName, tests[ testName ] );
       }
     }
   } else {
@@ -128,20 +113,18 @@
       var miniModernizr = {
             _version : '1.6ish: miniModernizr for Isotope'
           },
-          classes = [],
-          test, result, className;
+          classes = ' ',
+          result, testName;
 
       // Run through tests
-      for ( i=0; i < len; i++ ) {
-        test = tests[i];
-        result = test.getResult();
-        miniModernizr[ test.name ] = result;
-        className = ( result ?  '' : 'no-' ) + test.name;
-        classes.push( className );
+      for ( testName in tests) {
+        result = tests[ testName ]();
+        miniModernizr[ testName ] = result;
+        classes += ' ' + ( result ?  '' : 'no-' ) + testName;
       }
 
       // Add the new classes to the <html> element.
-      docElement.className += ' ' + classes.join( ' ' );
+      $('html').addClass( classes );
 
       return miniModernizr;
     })();
@@ -266,8 +249,20 @@
     };
 
   }
+  
+  // ========================= get transition-end event ===============================
+  
+  if ( Modernizr.csstransitions ) {
+    var transitionEndEvent = {
+      WebkitTransitionProperty: 'webkitTransitionEnd',  // webkit
+      MozTransitionProperty: 'transitionend',
+      OTransitionProperty: 'oTransitionEnd',
+      transitionProperty: 'transitionEnd'
+    }[ transitionProp ];
+    var transitionDurProp = getStyleProperty('transitionDuration');
+  }
 
-
+  // ========================= smartresize ===============================
 
   /*
    * smartresize: debounced resize event for jQuery
@@ -314,11 +309,11 @@
 
 
   // our "Widget" object constructor
-  $.Isotope = function( options, element ){
+  $.Isotope = function( options, element, callback ){
     this.element = $( element );
 
     this._create( options );
-    this._init();
+    this._init( callback );
   };
   
   // styles of container element we want to keep track of
@@ -353,7 +348,7 @@
     // sets up widget
     _create : function( options ) {
       
-      this.options = $.extend( true, {}, $.Isotope.settings, options );
+      this.options = $.extend( {}, $.Isotope.settings, options );
       
       this.styleQueue = [];
       this.elemCount = 0;
@@ -363,7 +358,7 @@
       this.originalStyle = {};
       for ( var i=0, len = isoContainerStyles.length; i < len; i++ ) {
         var prop = isoContainerStyles[i];
-        this.originalStyle[ prop ] = elemStyle[ prop ] || null;
+        this.originalStyle[ prop ] = elemStyle[ prop ] || '';
       }
       
       this.element.css({
@@ -377,6 +372,7 @@
       // sorting
       var originalOrderSorter = {
         'original-order' : function( $elem, instance ) {
+          instance.elemCount ++;
           return instance.elemCount;
         },
         random : function() {
@@ -407,6 +403,11 @@
         });
       }
       
+      // dismiss all click events from hidden events
+      this.element.delegate( '.' + this.options.hiddenClass, 'click', function(){
+        return false;
+      });
+      
     },
     
     _getAtoms : function( $elems ) {
@@ -436,7 +437,6 @@
       
       this.$filteredAtoms = this._filter( this.$allAtoms );
       this._sort();
-      
       this.reLayout( callback );
 
     },
@@ -446,22 +446,20 @@
       // signature: $('#foo').bar({ cool:false });
       if ( $.isPlainObject( opts ) ){
         this.options = $.extend( true, this.options, opts );
+
+        // trigger _updateOptionName if it exists
+        var updateOptionFn;
         for ( var optionName in opts ) {
-          this._updateOption( optionName );
+          updateOptionFn = '_update' + capitalize( optionName );
+          if ( this[ updateOptionFn ] ) {
+            this[ updateOptionFn ]();
+          }
         }
       }
     },
     
     // ====================== updaters ====================== //
     // kind of like setters
-    
-    // trigger _updateOptionName if it exists
-    _updateOption : function( optionName ) {
-      var updateOptionFn = '_update' + capitalize( optionName );
-      if ( this[ updateOptionFn ] ) {
-        this[ updateOptionFn ]();
-      }
-    },
     
     _updateAnimationEngine : function() {
       var animationEngine = this.options.animationEngine.toLowerCase().replace( /[ _\-]/g, '');
@@ -495,33 +493,27 @@
     // ====================== Filtering ======================
 
     _filter : function( $atoms ) {
-      var $filteredAtoms,
-          filter = this.options.filter === '' ? '*' : this.options.filter;
+      var filter = this.options.filter === '' ? '*' : this.options.filter;
 
       if ( !filter ) {
-        $filteredAtoms = $atoms;
-      } else {
-        var hiddenClass    = this.options.hiddenClass,
-            hiddenSelector = '.' + hiddenClass,
-            $visibleAtoms  = $atoms.not( hiddenSelector ),
-            $hiddenAtoms   = $atoms.filter( hiddenSelector ),
-            $atomsToShow   = $hiddenAtoms;
-
-        $filteredAtoms = $atoms.filter( filter );
-
-        if ( filter !== '*' ) {
-          $atomsToShow = $hiddenAtoms.filter( filter );
-
-          var $atomsToHide = $visibleAtoms.not( filter ).toggleClass( hiddenClass );
-          $atomsToHide.addClass( hiddenClass );
-          this.styleQueue.push({ $el: $atomsToHide, style: this.options.hiddenStyle });
-        }
-        
-        this.styleQueue.push({ $el: $atomsToShow, style: this.options.visibleStyle });
-        $atomsToShow.removeClass( hiddenClass );
+        return $atoms;
       }
-      
-      return $filteredAtoms;
+
+      var hiddenClass    = this.options.hiddenClass,
+          hiddenSelector = '.' + hiddenClass,
+          $hiddenAtoms   = $atoms.filter( hiddenSelector ),
+          $atomsToShow   = $hiddenAtoms;
+
+      if ( filter !== '*' ) {
+        $atomsToShow = $hiddenAtoms.filter( filter );
+        var $atomsToHide = $atoms.not( hiddenSelector ).not( filter ).addClass( hiddenClass );
+        this.styleQueue.push({ $el: $atomsToHide, style: this.options.hiddenStyle });
+      }
+
+      this.styleQueue.push({ $el: $atomsToShow, style: this.options.visibleStyle });
+      $atomsToShow.removeClass( hiddenClass );
+
+      return $atoms.filter( filter );
     },
     
     // ====================== Sorting ======================
@@ -535,13 +527,15 @@
         sortData = {};
         // get value for sort data based on fn( $elem ) passed in
         for ( var key in getSortData ) {
-          sortData[ key ] = getSortData[ key ]( $this, instance );
+          if ( !isIncrementingElemCount && key === 'original-order' ) {
+            // keep original order original
+            sortData[ key ] = $.data( this, 'isotope-sort-data' )[ key ];
+          } else {
+            sortData[ key ] = getSortData[ key ]( $this, instance );
+          }
         }
         // apply sort data to element
         $.data( this, 'isotope-sort-data', sortData );
-        if ( isIncrementingElemCount ) {
-          instance.elemCount ++;
-        }
       });
     },
     
@@ -607,31 +601,87 @@
         this.styleQueue.push({ $el: this.element, style: containerStyle });
       }
 
-      this._processStyleQueue();
-
-      // provide $elems as context for the callback
-      if ( callback ) {
-        callback.call( $elems );
-      }
+      this._processStyleQueue( $elems, callback );
       
       this.isLaidOut = true;
     },
     
-    _processStyleQueue : function() {
+    _processStyleQueue : function( $elems, callback ) {
       // are we animating the layout arrangement?
       // use plugin-ish syntax for css or animate
       var styleFn = !this.isLaidOut ? 'css' : (
             this.isUsingJQueryAnimation ? 'animate' : 'css'
           ),
           animOpts = this.options.animationOptions,
-          _isInsertingAnimated = this._isInserting && this.isUsingJQueryAnimation,
-          objStyleFn;
-      
+          objStyleFn, processor,
+          triggerCallbackNow, callbackFn;
+
+      // default styleQueue processor, may be overwritten down below
+      processor = function( i, obj ) {
+        obj.$el[ styleFn ]( obj.style, animOpts );
+      };
+
+      if ( this._isInserting && this.isUsingJQueryAnimation ) {
+        // if using styleQueue to insert items
+        processor = function( i, obj ) {
+          // only animate if it not being inserted
+          objStyleFn = obj.$el.hasClass('no-transition') ? 'css' : styleFn;
+          obj.$el[ objStyleFn ]( obj.style, animOpts );
+        };
+        
+      } else if ( callback ) {
+        // has callback
+        var isCallbackTriggered = false,
+            instance = this;
+        triggerCallbackNow = true;
+        // trigger callback only once
+        callbackFn = function() {
+          if ( isCallbackTriggered ) {
+            return;
+          }
+          callback.call( instance.element, $elems );
+          isCallbackTriggered = true;
+        };
+        
+        if ( this.isUsingJQueryAnimation && styleFn === 'animate' ) {
+          // add callback to animation options
+          animOpts.complete = callbackFn;
+          triggerCallbackNow = false;
+
+        } else if ( Modernizr.csstransitions ) {
+          // detect if first item has transition
+          var i = 0,
+              testElem = this.styleQueue[0].$el,
+              styleObj;
+          // get first non-empty jQ object
+          while ( !testElem.length ) {
+            styleObj = this.styleQueue[ i++ ];
+            // HACK: sometimes styleQueue[i] is undefined
+            if ( !styleObj ) {
+              return;
+            }
+            testElem = styleObj.$el;
+          }
+          // get transition duration of the first element in that object
+          // yeah, this is inexact
+          var duration = parseFloat( getComputedStyle( testElem[0] )[ transitionDurProp ] );
+          if ( duration > 0 ) {
+            processor = function( i, obj ) {
+              obj.$el[ styleFn ]( obj.style, animOpts )
+                // trigger callback at transition end
+                .one( transitionEndEvent, callbackFn );
+            }
+            triggerCallbackNow = false;
+          }
+        }
+      }
+
       // process styleQueue
-      $.each( this.styleQueue, function( i, obj ) {
-        objStyleFn = _isInsertingAnimated && obj.$el.hasClass('no-transition') ? 'css' : styleFn;
-        obj.$el[ objStyleFn ]( obj.style, animOpts );
-      });
+      $.each( this.styleQueue, processor );
+      
+      if ( triggerCallbackNow ) {
+        callbackFn()
+      }
 
       // clear out queue for next time
       this.styleQueue = [];
@@ -660,7 +710,6 @@
     addItems : function( $content, callback ) {
       var $newAtoms = this._getAtoms( $content );
       // add new atoms to atoms pools
-      // FIXME : this breaks shuffle order and returns to original order
       this.$allAtoms = this.$allAtoms.add( $newAtoms );
 
       if ( callback ) {
@@ -715,11 +764,8 @@
         $newAtoms.removeClass('no-transition');
         // reveal newly inserted filtered elements
         instance.styleQueue.push({ $el: $newAtoms, style: instance.options.visibleStyle });
-        instance._processStyleQueue();
-        delete instance._isInserting;
-        if ( callback ) {
-          callback( $newAtoms );
-        }
+        instance._isInserting = false;
+        instance._processStyleQueue( $newAtoms, callback );
       }, 10 );
     },
     
@@ -738,11 +784,11 @@
       
     },
     
-    shuffle : function() {
+    shuffle : function( callback ) {
       this.updateSortData( this.$allAtoms );
       this.options.sortBy = 'random';
       this._sort();
-      this.reLayout();
+      this.reLayout( callback );
     },
     
     // destroys widget, returns elements and container back (close) to original style
@@ -753,12 +799,12 @@
       this.$allAtoms
         .removeClass( this.options.hiddenClass + ' ' + this.options.itemClass )
         .each(function(){
-          this.style.position = null;
-          this.style.top = null;
-          this.style.left = null;
-          this.style.opacity = null;
+          this.style.position = '';
+          this.style.top = '';
+          this.style.left = '';
+          this.style.opacity = '';
           if ( usingTransforms ) {
-            this.style[ transformProp ] = null;
+            this.style[ transformProp ] = '';
           }
         });
       
@@ -771,6 +817,7 @@
       
       this.element
         .unbind('.isotope')
+        .undelegate( '.' + this.options.hiddenClass, 'click' )
         .removeClass( this.options.containerClass )
         .removeData('isotope');
       
@@ -1195,38 +1242,60 @@
   };
   
   
-  // ======================= imagesLoaded Plugin  ===============================
-  // A fork of http://gist.github.com/268257 by Paul Irish
+  // ======================= imagesLoaded Plugin ===============================
+  /*!
+   * jQuery imagesLoaded plugin v1.0.3
+   * http://github.com/desandro/imagesloaded
+   *
+   * MIT License. by Paul Irish et al.
+   */
 
-  // mit license. paul irish. 2010.
-  // webkit fix from Oren Solomianik. thx!
 
-  $.fn.imagesLoaded = function(callback){
-    var elems = this.find('img'),
-        len   = elems.length,
-        _this = this;
+  // $('#my-container').imagesLoaded(myFunction)
+  // or
+  // $('img').imagesLoaded(myFunction)
 
-    if ( !elems.length ) {
-      callback.call( this );
+  // execute a callback when all images have loaded.
+  // needed because .load() doesn't work on cached images
+
+  // callback function gets image collection as argument
+  //  `this` is the container
+
+  $.fn.imagesLoaded = function( callback ) {
+    var $this = this,
+        $images = $this.find('img').add( $this.filter('img') ),
+        len = $images.length,
+        blank = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+
+    function triggerCallback() {
+      callback.call( $this, $images );
     }
 
-    elems.bind('load',function(){
-      if (--len <= 0){ 
-        callback.call( _this ); 
+    function imgLoaded() {
+      if ( --len <= 0 && this.src !== blank ){
+        setTimeout( triggerCallback );
+        $images.unbind( 'load error', imgLoaded );
       }
-    }).each(function(){
+    }
+
+    if ( !len ) {
+      triggerCallback();
+    }
+
+    $images.bind( 'load error',  imgLoaded ).each( function() {
       // cached images don't fire load sometimes, so we reset src.
       if (this.complete || this.complete === undefined){
         var src = this.src;
         // webkit hack from http://groups.google.com/group/jquery-dev/browse_thread/thread/eee6ab7b2da50e1f
         // data uri bypasses webkit log warning (thx doug jones)
-        this.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+        this.src = blank;
         this.src = src;
-      }  
-    }); 
+      }
+    });
 
-    return this;
+    return $this;
   };
+
 
   // helper function for logging errors
   // $.error breaks jQuery chaining
@@ -1243,7 +1312,7 @@
   // A bit from jcarousel 
   //   https://github.com/jsor/jcarousel/blob/master/lib/jquery.jcarousel.js
 
-  $.fn.isotope = function( options ) {
+  $.fn.isotope = function( options, callback ) {
     if ( typeof options === 'string' ) {
       // call method
       var args = Array.prototype.slice.call( arguments, 1 );
@@ -1268,10 +1337,10 @@
         if ( instance ) {
           // apply options & init
           instance.option( options );
-          instance._init();
+          instance._init( callback );
         } else {
           // initialize new instance
-          $.data( this, 'isotope', new $.Isotope( options, this ) );
+          $.data( this, 'isotope', new $.Isotope( options, this, callback ) );
         }
       });
     }
