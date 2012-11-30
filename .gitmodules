@@ -1,0 +1,3 @@
+[submodule "vendor/isotope"]
+	path = vendor/isotope
+	url = git://github.com/desandro/isotope.git
