@@ -1,5 +1,5 @@
 /**
- * Isotope v1.5.12
+ * Isotope v1.5.14
  * An exquisite jQuery plugin for magical layouts
  * http://isotope.metafizzy.co
  *
@@ -9,7 +9,7 @@
  * Copyright 2012 David DeSandro / Metafizzy
  */
 
-/*jshint browser: true, curly: true, eqeqeq: true, forin: false, immed: false, newcap: true, noempty: true, strict: true, undef: true */
+/*jshint asi: true, browser: true, curly: true, eqeqeq: true, forin: false, immed: false, newcap: true, noempty: true, strict: true, undef: true */
 /*global jQuery: false */
 
 (function( window, $, undefined ){
@@ -322,7 +322,7 @@
   };
   
   // styles of container element we want to keep track of
-  var isoContainerStyles = [ 'overflow', 'position', 'width', 'height' ];
+  var isoContainerStyles = [ 'width', 'height' ];
 
   var $window = $(window);
 
@@ -334,6 +334,10 @@
     hiddenClass : 'isotope-hidden',
     hiddenStyle: { opacity: 0, scale: 0.001 },
     visibleStyle: { opacity: 1, scale: 1 },
+    containerStyle: {
+      position: 'relative',
+      overflow: 'hidden'
+    },
     animationEngine: 'best-available',
     animationOptions: {
       queue: false,
@@ -359,15 +363,17 @@
       // get original styles in case we re-apply them in .destroy()
       var elemStyle = this.element[0].style;
       this.originalStyle = {};
-      for ( var i=0, len = isoContainerStyles.length; i < len; i++ ) {
-        var prop = isoContainerStyles[i];
+      // keep track of container styles
+      var containerStyles = isoContainerStyles.slice(0);
+      for ( var prop in this.options.containerStyle ) {
+        containerStyles.push( prop );
+      }
+      for ( var i=0, len = containerStyles.length; i < len; i++ ) {
+        prop = containerStyles[i];
         this.originalStyle[ prop ] = elemStyle[ prop ] || '';
       }
-      
-      this.element.css({
-        overflow : 'hidden',
-        position : 'relative'
-      });
+      // apply container style from options
+      this.element.css( this.options.containerStyle );
       
       this._updateAnimationEngine();
       this._updateUsingTransforms();
@@ -586,8 +592,8 @@
     },
 
     _pushPosition : function( $elem, x, y ) {
-      x += this.offset.left;
-      y += this.offset.top;
+      x = Math.round( x + this.offset.left );
+      y = Math.round( y + this.offset.top );
       var position = this.getPositionStyles( x, y );
       this.styleQueue.push({ $el: $elem, style: position });
       if ( this.options.itemPositionDataEnabled ) {
@@ -848,8 +854,7 @@
       
       // re-apply saved container styles
       var elemStyle = this.element[0].style;
-      for ( var i=0, len = isoContainerStyles.length; i < len; i++ ) {
-        var prop = isoContainerStyles[i];
+      for ( var prop in this.originalStyle ) {
         elemStyle[ prop ] = this.originalStyle[ prop ];
       }
       
@@ -1051,8 +1056,8 @@
         var $this = $(this),
             col = props.index % props.cols,
             row = Math.floor( props.index / props.cols ),
-            x = Math.round( ( col + 0.5 ) * props.columnWidth - $this.outerWidth(true) / 2 ),
-            y = Math.round( ( row + 0.5 ) * props.rowHeight - $this.outerHeight(true) / 2 );
+            x = ( col + 0.5 ) * props.columnWidth - $this.outerWidth(true) / 2,
+            y = ( row + 0.5 ) * props.rowHeight - $this.outerHeight(true) / 2;
         instance._pushPosition( $this, x, y );
         props.index ++;
       });
@@ -1237,8 +1242,8 @@
         var $this = $(this),
             col = Math.floor( props.index / props.rows ),
             row = props.index % props.rows,
-            x = Math.round( ( col + 0.5 ) * props.columnWidth - $this.outerWidth(true) / 2 ),
-            y = Math.round( ( row + 0.5 ) * props.rowHeight - $this.outerHeight(true) / 2 );
+            x = ( col + 0.5 ) * props.columnWidth - $this.outerWidth(true) / 2,
+            y = ( row + 0.5 ) * props.rowHeight - $this.outerHeight(true) / 2;
         instance._pushPosition( $this, x, y );
         props.index ++;
       });
